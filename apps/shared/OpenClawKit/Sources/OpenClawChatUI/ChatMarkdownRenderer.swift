@@ -22,15 +22,89 @@ struct ChatMarkdownRenderer: View {
     var body: some View {
         let processed = ChatMarkdownPreprocessor.preprocess(markdown: self.text)
         VStack(alignment: .leading, spacing: 10) {
-            StructuredText(markdown: processed.cleaned)
+            ForEach(CodeBlockParser.parse(markdown: processed.cleaned)) { segment in
+                switch segment.kind {
+                case .text:
+                    StructuredText(markdown: segment.raw)
+                        .modifier(ChatMarkdownStyle(
+                            variant: self.variant,
+                            context: self.context,
+                            font: self.font,
+                            textColor: self.textColor))
+                case let .code(lang, content):
+                    ChatCodeBlockView(
+                        code: content,
+                        lang: lang,
+                        raw: segment.raw,
+                        variant: self.variant,
+                        context: self.context,
+                        font: self.font,
+                        textColor: self.textColor)
+                }
+            }
+
+            if !processed.images.isEmpty {
+                InlineImageList(images: processed.images)
+            }
+        }
+    }
+}
+
+@MainActor
+struct ChatCodeBlockView: View {
+    let code: String
+    let lang: String?
+    let raw: String
+    let variant: ChatMarkdownVariant
+    let context: ChatMarkdownRenderer.Context
+    let font: Font
+    let textColor: Color
+
+    @State private var copied = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            StructuredText(markdown: self.raw)
                 .modifier(ChatMarkdownStyle(
                     variant: self.variant,
                     context: self.context,
                     font: self.font,
                     textColor: self.textColor))
+                .padding(.top, 2) // Slight adjustment for the button
 
-            if !processed.images.isEmpty {
-                InlineImageList(images: processed.images)
+            Button {
+                self.copyToClipboard()
+            } label: {
+                Image(systemName: self.copied ? "checkmark" : "doc.on.doc")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+                    .padding(6)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+            }
+            .buttonStyle(.plain)
+            .padding(4)
+            .help("Copy code")
+        }
+    }
+
+    private func copyToClipboard() {
+        #if os(macOS)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(self.code, forType: .string)
+        #else
+        UIPasteboard.general.string = self.code
+        #endif
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            self.copied = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation {
+                self.copied = false
             }
         }
     }
