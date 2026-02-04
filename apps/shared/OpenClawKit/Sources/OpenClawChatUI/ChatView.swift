@@ -11,13 +11,8 @@ public struct OpenClawChatView: View {
     @State private var scrollerBottomID = "chat-bottom-anchor"
     @State private var scrollPosition: ScrollPosition = ScrollPosition()
     @State private var showSessions = false
-    
-    // Tracks the exact scroll offset (y) to restore position after refresh.
     @State private var savedScrollOffset: CGFloat = 0
-    
-    // Tracks if we are visually at the bottom, independent of IDs.
     @State private var isUserAtBottom = true
-    
     private let showsSessionSwitcher: Bool
     private let style: Style
     private let markdownVariant: ChatMarkdownVariant
@@ -109,7 +104,6 @@ public struct OpenClawChatView: View {
                     .padding(.top, Layout.messageListPaddingTop)
                     .padding(.horizontal, Layout.messageListPaddingHorizontal)
                 }
-                // Track the top visible ID for state restoration (non-snapping).
                 .scrollPosition(self.$scrollPosition)
                 .onScrollGeometryChange(for: Bool.self) { geometry in
                     let contentHeight = geometry.contentSize.height
@@ -130,11 +124,9 @@ public struct OpenClawChatView: View {
                 }
                 .onChange(of: self.viewModel.isLoading) { wasLoading, isLoading in
                     if wasLoading && !isLoading {
-                        // Loading finished.
                         if self.isUserAtBottom {
                             self.scrollToBottom(proxy: proxy)
                         } else {
-                            // Restore exact scroll offset.
                             self.scrollPosition = ScrollPosition(point: CGPoint(x: 0, y: self.savedScrollOffset))
                         }
                     }
@@ -259,15 +251,16 @@ public struct OpenClawChatView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else if self.showsEmptyState {
-            ChatNoticeCard(
-                systemImage: "bubble.left.and.bubble.right.fill",
+            ChatEmptyStateView(
                 title: self.emptyStateTitle,
                 message: self.emptyStateMessage,
-                tint: .accentColor,
-                actionTitle: nil,
-                action: nil)
-                .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                onSelect: { prompt in
+                    self.viewModel.input = prompt
+                    // Optional: auto-send or just fill? Let's just fill for safety/editing.
+                }
+            )
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -420,6 +413,72 @@ public struct OpenClawChatView: View {
         DispatchQueue.main.async {
             proxy.scrollTo(self.scrollerBottomID, anchor: .bottom)
         }
+    }
+}
+
+private struct ChatEmptyStateView: View {
+    let title: String
+    let message: String
+    let onSelect: (String) -> Void
+
+    private let suggestions = [
+        "Summarize the last message",
+        "Help me write a Python script",
+        "Explain this code",
+        "What's the weather?"
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.accentColor.opacity(0.16))
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                }
+                .frame(width: 52, height: 52)
+
+                Text(self.title)
+                    .font(.headline)
+
+                Text(self.message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(4)
+                    .frame(maxWidth: 360)
+            }
+
+            VStack(spacing: 8) {
+                ForEach(self.suggestions, id: \.self) { suggestion in
+                    Button {
+                        self.onSelect(suggestion)
+                    } label: {
+                        Text(suggestion)
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(OpenClawChatTheme.subtleCard)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(Color.primary.opacity(0.04), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: 260)
+        }
+        .padding(32)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(OpenClawChatTheme.card.opacity(0.5))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)))
     }
 }
 
