@@ -181,9 +181,15 @@ private struct ChatMessageBody: View {
                     context: .user,
                     variant: self.markdownVariant,
                     font: .system(size: 14),
-                    textColor: textColor)
+                    textColor: textColor,
+                    codeBlockBorderColor: self.bubbleBorderColor,
+                    codeBlockBorderWidth: self.bubbleBorderWidth)
             } else {
-                ChatAssistantTextBody(text: text, markdownVariant: self.markdownVariant)
+                ChatAssistantTextBody(
+                    text: text,
+                    markdownVariant: self.markdownVariant,
+                    borderColor: self.bubbleBorderColor,
+                    borderWidth: self.bubbleBorderWidth)
             }
 
             if !self.inlineAttachments.isEmpty {
@@ -491,7 +497,11 @@ struct ChatStreamingAssistantBubble: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ChatAssistantTextBody(text: self.text, markdownVariant: self.markdownVariant)
+            ChatAssistantTextBody(
+                text: self.text,
+                markdownVariant: self.markdownVariant,
+                borderColor: Color.white.opacity(0.08),
+                borderWidth: 1)
         }
         .padding(12)
         .background(
@@ -598,6 +608,8 @@ private struct TypingDots: View {
 private struct ChatAssistantTextBody: View {
     let text: String
     let markdownVariant: ChatMarkdownVariant
+    let borderColor: Color
+    let borderWidth: CGFloat
 
     var body: some View {
         let segments = AssistantTextParser.segments(from: self.text)
@@ -609,7 +621,9 @@ private struct ChatAssistantTextBody: View {
                     context: .assistant,
                     variant: self.markdownVariant,
                     font: font,
-                    textColor: OpenClawChatTheme.assistantText)
+                    textColor: OpenClawChatTheme.assistantText,
+                    codeBlockBorderColor: self.borderColor,
+                    codeBlockBorderWidth: self.borderWidth)
             }
         }
     }

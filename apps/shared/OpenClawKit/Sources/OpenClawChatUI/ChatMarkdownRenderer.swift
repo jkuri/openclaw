@@ -18,6 +18,8 @@ struct ChatMarkdownRenderer: View {
     let variant: ChatMarkdownVariant
     let font: Font
     let textColor: Color
+    var codeBlockBorderColor: Color = Color.primary.opacity(0.06)
+    var codeBlockBorderWidth: CGFloat = 1
 
     var body: some View {
         let processed = ChatMarkdownPreprocessor.preprocess(markdown: self.text)
@@ -39,7 +41,9 @@ struct ChatMarkdownRenderer: View {
                         variant: self.variant,
                         context: self.context,
                         font: self.font,
-                        textColor: self.textColor)
+                        textColor: self.textColor,
+                        borderColor: self.codeBlockBorderColor,
+                        borderWidth: self.codeBlockBorderWidth)
                 }
             }
 
@@ -59,6 +63,8 @@ struct ChatCodeBlockView: View {
     let context: ChatMarkdownRenderer.Context
     let font: Font
     let textColor: Color
+    let borderColor: Color
+    let borderWidth: CGFloat
 
     @State private var copied = false
 
@@ -71,6 +77,10 @@ struct ChatCodeBlockView: View {
                     font: self.font,
                     textColor: self.textColor))
                 .padding(.top, 2) // Slight adjustment for the button
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(self.borderColor, lineWidth: self.borderWidth))
 
             Button {
                 self.copyToClipboard()
