@@ -17,7 +17,11 @@ private let chatUILogger = Logger(subsystem: "ai.openclaw", category: "OpenClawC
 public final class OpenClawChatViewModel {
     public private(set) var messages: [OpenClawChatMessage] = []
     public var input: String = ""
-    public var thinkingLevel: String = "off"
+    public var thinkingLevel: String = UserDefaults.standard.string(forKey: "OpenClaw.thinkingLevel") ?? "off" {
+        didSet {
+            UserDefaults.standard.set(self.thinkingLevel, forKey: "OpenClaw.thinkingLevel")
+        }
+    }
     public private(set) var isLoading = false
     public private(set) var isSending = false
     public private(set) var isAborting = false
@@ -153,10 +157,13 @@ public final class OpenClawChatViewModel {
         self.isLoading = true
         self.errorText = nil
         self.healthOK = false
-        self.clearPendingRuns(reason: nil)
+        // Don't clear pending runs on refresh - the agent might still be working!
+        // Only clear them when switching sessions or on explicit user action.
+        // self.clearPendingRuns(reason: nil)
         self.pendingToolCallsById = [:]
         self.streamingAssistantText = nil
-        self.sessionId = nil
+        // Don't reset sessionId on refresh - keep it to track ongoing runs
+        // self.sessionId = nil
         defer { self.isLoading = false }
         do {
             do {
@@ -167,10 +174,20 @@ public final class OpenClawChatViewModel {
 
             let payload = try await self.transport.requestHistory(sessionKey: self.sessionKey)
             self.messages = Self.decodeMessages(payload.messages ?? [])
-            self.sessionId = payload.sessionId
+            // Only update sessionId if we don't have one yet
+            if self.sessionId == nil {
+                self.sessionId = payload.sessionId
+            }
+
+            // Fix: Do NOT overwrite the local thinking preference with the server's state on refresh.
+            // This prevents the UI from reverting to "low" (or whatever the server last saw)
+            // when the user has locally selected "high" but hasn't sent a message yet.
+            /*
             if let level = payload.thinkingLevel, !level.isEmpty {
                 self.thinkingLevel = level
             }
+            */
+
             await self.pollHealthIfNeeded(force: true)
             await self.fetchSessions(limit: 50)
             self.errorText = nil
@@ -328,6 +345,8 @@ public final class OpenClawChatViewModel {
         let next = sessionKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !next.isEmpty else { return }
         guard next != self.sessionKey else { return }
+        // Clear pending runs when switching sessions since they belong to the old session
+        self.clearPendingRuns(reason: nil)
         self.sessionKey = next
         await self.bootstrap()
     }
@@ -380,9 +399,11 @@ public final class OpenClawChatViewModel {
             // Keep multiple clients in sync: if another client finishes a run for our session, refresh history.
             switch chat.state {
             case "final", "aborted", "error":
-                self.streamingAssistantText = nil
-                self.pendingToolCallsById = [:]
-                Task { await self.refreshHistoryAfterRun() }
+                Task {
+                    await self.refreshHistoryAfterRun()
+                    self.streamingAssistantText = nil
+                    self.pendingToolCallsById = [:]
+                }
             default:
                 break
             }
@@ -394,14 +415,18 @@ public final class OpenClawChatViewModel {
             if chat.state == "error" {
                 self.errorText = chat.errorMessage ?? "Chat failed"
             }
-            if let runId = chat.runId {
-                self.clearPendingRun(runId)
-            } else if self.pendingRuns.count <= 1 {
-                self.clearPendingRuns(reason: nil)
+            
+            Task {
+                await self.refreshHistoryAfterRun()
+                
+                if let runId = chat.runId {
+                    self.clearPendingRun(runId)
+                } else if self.pendingRuns.count <= 1 {
+                    self.clearPendingRuns(reason: nil)
+                }
+                self.pendingToolCallsById = [:]
+                self.streamingAssistantText = nil
             }
-            self.pendingToolCallsById = [:]
-            self.streamingAssistantText = nil
-            Task { await self.refreshHistoryAfterRun() }
         default:
             break
         }
@@ -442,9 +467,11 @@ public final class OpenClawChatViewModel {
             let payload = try await self.transport.requestHistory(sessionKey: self.sessionKey)
             self.messages = Self.decodeMessages(payload.messages ?? [])
             self.sessionId = payload.sessionId
+            /*
             if let level = payload.thinkingLevel, !level.isEmpty {
                 self.thinkingLevel = level
             }
+            */
         } catch {
             chatUILogger.error("refresh history failed \(error.localizedDescription, privacy: .public)")
         }

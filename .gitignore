@@ -71,3 +71,6 @@ USER.md
 
 # local tooling
 .serena/
+
+apps/shared/OpenClawKit/Package.resolved
+apps/shared/OpenClawKit/.build

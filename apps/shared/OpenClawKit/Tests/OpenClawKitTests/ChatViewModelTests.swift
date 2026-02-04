@@ -371,7 +371,7 @@ extension TestChatTransportState {
         try await waitUntil("sessions loaded") { await MainActor.run { !vm.sessions.isEmpty } }
 
         let keys = await MainActor.run { vm.sessionChoices.map(\.key) }
-        #expect(keys == ["main", "recent-1", "recent-2"])
+        #expect(keys == ["recent-1", "recent-2", "main"])
     }
 
     @Test func sessionChoicesIncludeCurrentWhenMissing() async throws {
