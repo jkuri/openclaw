@@ -105,17 +105,11 @@ enum CronSchedule: Codable, Equatable {
         makeIsoFormatter(withFractional: false).string(from: date)
     }
 
-    private static var isoFormatter: ISO8601DateFormatter {
+    private static func makeIsoFormatter(withFractional: Bool) -> ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = withFractional
             ? [.withInternetDateTime, .withFractionalSeconds]
             : [.withInternetDateTime]
-        return formatter
-    }
-
-    private static var isoFormatterWithFractional: ISO8601DateFormatter {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }
 }
